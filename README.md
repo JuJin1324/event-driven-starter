@@ -118,5 +118,155 @@
 ### 참조사이트
 > [EDA(Event Driven Architecture)이란?](https://akasai.space/architecture/about_event_driven_architecture/)
 
+---
+
 ## Spring Event
+### 스프링 이벤트를 사용하는 이유와 장점
+> spring event를 사용하는 가장 주된 이유는 '서비스 간의 강한 의존성을 줄이기 위함'이라고 볼 수 있는데요.
+> 예를 들어 어떤 상품을 주문하는 프로세스가 있고, 해당 프로세스는 내부적으로 주문을 처리한 뒤 푸시 메시지를 발송하고, 메일을 전송하는 과정을 거친다고 가정하겠습니다.
+> '주문 처리'와 '푸시 메시지 발송', '메일 전송' 기능이 각각의 서비스(OrderService, PushService, MailService)에 구현되어 있을 경우, 
+> 주문 처리를 하는 OrderService 에서 푸시 메시지 발송을 하는 PushService 와 메일 전송을 하는 MailService 에 대한 의존성을 주입받아 
+> 사용하게 되는데요.  
+> 도메인 사이의 강한 의존성으로 인해 시스템이 복잡해지는 경우가 발생할 수 있다고 하며, 스프링 이벤트를 통해 이러한 도메인 간의 의존성을 줄일 수 있게 됩니다.  
+
+### 스프링 이벤트 구성 요소 및 동작 구현
+> spring event 는 크게 'event class'와 이벤트를 발생시키는 'event publisher' 그리고 이벤트를 받아들이는 'event listener' 3가지 요소로 볼 수 있는데요.  
+> event class: OrderedEvent.java
+> ```java
+> public class OrderedEvent {
+>     private String productName;
 > 
+>     public OrderedEvent(String productName) {
+>         this.productName = productName;
+>     }
+> 
+>     public String getProductName() {
+>         return productName;
+>     }
+> }
+> ```
+> 
+> event publisher: OrderService.java
+> ```java
+> @Service
+> @RequiredArgsConstructor
+> public class OrderService {
+> 
+>     private final ApplicationEventPublisher publisher;
+> 
+>     public void order(String productName) {
+>         //주문 처리
+>         log.info(String.format("주문 로직 처리 [상품명 : %s]", productName));
+>         publisher.publishEvent(new OrderedEvent(productName));
+>     }
+> }
+> ```
+> 
+> event listener: OrderedEventListener.java
+> ```java
+> @Component
+> public class OrderedEventListener {
+> 
+>     @EventListener
+>     public void sendPush(OrderedEvent event) throws InterruptedException {
+>         log.info(String.format("푸시 메세지 발송 [상품명 : %s]", event.getProductName()));
+>     }
+> 
+>     @EventListener
+>     public void sendMail(OrderedEvent event) throws InterruptedException {
+>         log.info(String.format("메일 전송 [상품명 : %s]", event.getProductName()));
+>     }
+> }
+> ```
+
+### 비동기 처리
+> Main class
+> ```java
+> @EnableAsync
+> @SpringBootApplication
+> public class EventApplication {
+> 
+> 	public static void main(String[] args) {
+> 		SpringApplication.run(EventApplication.class, args);
+> 	}
+> }
+> ```
+>
+> event listener: OrderedEventListener.java
+> ```java
+> @Component
+> public class OrderedEventListener {
+>     @Async 
+>     @EventListener
+>     public void sendPush(OrderedEvent event) throws InterruptedException {
+>         log.info(String.format("푸시 메세지 발송 [상품명 : %s]", event.getProductName()));
+>     }
+> 
+>     @Async
+>     @EventListener
+>     public void sendMail(OrderedEvent event) throws InterruptedException {
+>         log.info(String.format("메일 전송 [상품명 : %s]", event.getProductName()));
+>     }
+> }
+> ```
+
+### @TransactionalEventListener를 사용해야 하는 경우
+> SignUpMemberService.java
+>  ```java
+> ...
+> private final MemberRepository memberRepository;
+> private final ApplicationEventPublisher eventPublisher;
+> 
+> @Transactional
+> public void signup(MemberDto memberDto) {
+>     //1. 회원가입 회원 정보 저장
+>     memberRepository.save(new Member(memberDto.getId(), memberDto.getName()));
+>     //2. 회원가입 축하 메일 전송 이벤트 발생
+>     eventPublisher.publishEvent(new SavedMemberEvent(memberDto));
+> 
+>     //3. 어떠한 사유로 인해 exception 발생
+>     if (memberDto.getName().equals("master")) {
+>         throw new RuntimeException("can not use this name.");
+>     }
+> }
+> ```
+> @EventListener 의 경우 publishEvent() 메서드가 호출되는 시점에서 바로 이벤트를 publishing 하는데요.
+> 만약 다음과 같이 트랜잭션으로 묶인 signup() 메서드에서 '1. 회원가입 회원 정보 저장' 부분과 '2. 회원가입 축하 메일 전송 이벤트 발생' 부분이 정상적으로 동작한 뒤에 
+> '3. 어떠한 사유로 인해 exception 발생' 부분에서 exception이 발생된다면, '1. 회원 정보 저장' 부분은 트랜잭션에 의해 롤백이 실행되지만, 
+> '2. 축하 메일 전송' 부분은 롤백이 되지 않는 상황이 발생하게 됩니다.  
+> 이러한 경우가 발생하기 때문에 트랜잭션이 적용되는 로직에서 이벤트 처리가 필요할 때는 @TransactionalEventListener 가 사용되는 것인데요.  
+
+### @TransactionalEventListener 옵션
+> 사용법은 phase 옵션을 통해 트랜잭션 상태에 따른 이벤트 처리를 적용할 수 있는데요.
+> 1. @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT): default 값이며, 트랜잭션이 commit 되었을 때 이벤트를 실행합니다.
+> 2. @TransactionalEventListener(phase = TransactionPhase.ROLLBACK): 트랜잭션이 rollback 되었을 때 이벤트를 실행합니다.
+> 3. @TransactionalEventListener(phase = TransactionPhase.AFTER_COMPLETION): 트랜잭션이 completion(commit 또는 rollback) 되었을 때 이벤트 실행합니다.
+> 4. @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT): 트랜잭션이 commit 되기 전에 이벤트를 실행합니다.
+
+### Propagation.REQUIRES_NEW
+> ```java
+> @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+> public void transactionalEventListenerAfterCommit(SavedMemberEvent event) {
+>     eventLogRepository.save(new EventLog(1L, "event log1"));
+> }
+> ```
+> 위 코드와 같이 이벤트 리스너에서 추가로 데이터베이스에 insert, update, delete 작업을 진행해야 하는 경우가 있을 수 있는데요.  
+> 실제로 해당 코드가 동작하였을 때, 오류가 발생하지 않고 동작하였음에도 불구하고 eventLog에 대한 데이터는 insert 되지 않는 상황이 생기게 됩니다.
+> 이유는 @TransactionalEventListener 의 경우 event publisher(여기서는 SavedMemberEvent 를 발생시킨 Service) 의 트랜잭션 안에서 동작하며, 
+> 커밋이 된 이후 추가 커밋을 허용하지 않기 때문인데요.  
+> 때문에 insert, update, delete 같은 작업이 필요한 경우 아래 코드와 같이 이벤트 리스너에서 @Transactional(propagation = Propagation.REQUIRES_NEW)를 
+> 추가 설정하는 과정이 필요합니다.
+> ```java
+> @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+> @Transactional(propagation = Propagation.REQUIRES_NEW)
+> public void transactionalEventListenerAfterCommit(SavedMemberEvent event) {
+>     eventLogRepository.save(new EventLog(1L, "event log1"));
+> }
+> ```
+> REQUIRES_NEW 설정은 해당 메서드가 이전 트랜잭션을 이어받지 않고 새로운 트랜잭션을 시작하겠다는 설정인데요.  
+> event publisher 의 commit을 보장하고, 이벤트 리스너에서는 새로운 트랜잭션에서의 작업 수행을 가능하게 합니다.  
+
+### 참조사이트
+> [spring 이벤트 사용하기(event publisher, event listener)](https://wildeveloperetrain.tistory.com/217)  
+> [Spring Event, @TransactionalEventListener 사용하기](https://wildeveloperetrain.tistory.com/246)  
+
