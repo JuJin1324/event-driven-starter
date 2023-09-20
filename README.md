@@ -180,6 +180,7 @@
 > ```
 
 ### 비동기 처리
+> @Async을 추가하면 해당 메서드는 기존 스레드와 분리되게 됩니다. 따라서 OrderService 의 order 메서드의 응답 대기는 사라지며 트랜잭션도 분리됩니다.  
 > Main class
 > ```java
 > @EnableAsync
@@ -232,7 +233,7 @@
 > ```
 > @EventListener 의 경우 publishEvent() 메서드가 호출되는 시점에서 바로 이벤트를 publishing 하는데요.
 > 만약 다음과 같이 트랜잭션으로 묶인 signup() 메서드에서 '1. 회원가입 회원 정보 저장' 부분과 '2. 회원가입 축하 메일 전송 이벤트 발생' 부분이 정상적으로 동작한 뒤에 
-> '3. 어떠한 사유로 인해 exception 발생' 부분에서 exception이 발생된다면, '1. 회원 정보 저장' 부분은 트랜잭션에 의해 롤백이 실행되지만, 
+> '3. 어떠한 사유로 인해 exception 발생' 부분에서 exception 이 발생된다면, '1. 회원 정보 저장' 부분은 트랜잭션에 의해 롤백이 실행되지만, 
 > '2. 축하 메일 전송' 부분은 롤백이 되지 않는 상황이 발생하게 됩니다.  
 > 이러한 경우가 발생하기 때문에 트랜잭션이 적용되는 로직에서 이벤트 처리가 필요할 때는 @TransactionalEventListener 가 사용되는 것인데요.  
 
@@ -255,7 +256,7 @@
 > 이유는 @TransactionalEventListener 의 경우 event publisher(여기서는 SavedMemberEvent 를 발생시킨 Service) 의 트랜잭션 안에서 동작하며, 
 > 커밋이 된 이후 추가 커밋을 허용하지 않기 때문인데요.  
 > 때문에 insert, update, delete 같은 작업이 필요한 경우 아래 코드와 같이 이벤트 리스너에서 @Transactional(propagation = Propagation.REQUIRES_NEW)를 
-> 추가 설정하는 과정이 필요합니다.
+> 추가 설정하는 과정이 필요합니다. (혹은 @Async 를 붙이면 별도의 스레드에서 동작하기 때문에 propagation 이 없이도 정상 commit 됨.)    
 > ```java
 > @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
 > @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -269,4 +270,4 @@
 ### 참조사이트
 > [spring 이벤트 사용하기(event publisher, event listener)](https://wildeveloperetrain.tistory.com/217)  
 > [Spring Event, @TransactionalEventListener 사용하기](https://wildeveloperetrain.tistory.com/246)  
-
+> [Spring - Event Driven](https://velog.io/@backtony/Spring-Event-Driven)  
