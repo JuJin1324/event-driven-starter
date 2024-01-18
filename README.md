@@ -122,7 +122,7 @@
 
 ## Spring Event
 ### 스프링 이벤트를 사용하는 이유와 장점
-> spring event를 사용하는 가장 주된 이유는 '서비스 간의 강한 의존성을 줄이기 위함'이라고 볼 수 있는데요.
+> spring event 를 사용하는 가장 주된 이유는 '서비스 간의 강한 의존성을 줄이기 위함'이라고 볼 수 있는데요.
 > 예를 들어 어떤 상품을 주문하는 프로세스가 있고, 해당 프로세스는 내부적으로 주문을 처리한 뒤 푸시 메시지를 발송하고, 메일을 전송하는 과정을 거친다고 가정하겠습니다.
 > '주문 처리'와 '푸시 메시지 발송', '메일 전송' 기능이 각각의 서비스(OrderService, PushService, MailService)에 구현되어 있을 경우, 
 > 주문 처리를 하는 OrderService 에서 푸시 메시지 발송을 하는 PushService 와 메일 전송을 하는 MailService 에 대한 의존성을 주입받아 
@@ -130,7 +130,7 @@
 > 도메인 사이의 강한 의존성으로 인해 시스템이 복잡해지는 경우가 발생할 수 있다고 하며, 스프링 이벤트를 통해 이러한 도메인 간의 의존성을 줄일 수 있게 됩니다.  
 
 ### 스프링 이벤트 구성 요소 및 동작 구현
-> spring event 는 크게 'event class'와 이벤트를 발생시키는 'event publisher' 그리고 이벤트를 받아들이는 'event listener' 3가지 요소로 볼 수 있는데요.  
+> spring event 는 크게 'event class' 와 이벤트를 발생시키는 'event publisher' 그리고 이벤트를 받아들이는 'event listener' 3가지 요소로 볼 수 있는데요.  
 > event class: OrderedEvent.java
 > ```java
 > public class OrderedEvent {
@@ -180,7 +180,7 @@
 > ```
 
 ### 비동기 처리
-> @Async을 추가하면 해당 메서드는 기존 스레드와 분리되게 됩니다. 따라서 OrderService 의 order 메서드의 응답 대기는 사라지며 트랜잭션도 분리됩니다.  
+> @Async 을 추가하면 해당 메서드는 기존 스레드와 분리되게 됩니다. 따라서 OrderService 의 order 메서드의 응답 대기는 사라지며 트랜잭션도 분리됩니다.  
 > Main class
 > ```java
 > @EnableAsync
@@ -211,7 +211,7 @@
 > }
 > ```
 
-### @TransactionalEventListener를 사용해야 하는 경우
+### @TransactionalEventListener 를 사용해야 하는 경우
 > SignUpMemberService.java
 >  ```java
 > ...
@@ -252,7 +252,7 @@
 > }
 > ```
 > 위 코드와 같이 이벤트 리스너에서 추가로 데이터베이스에 insert, update, delete 작업을 진행해야 하는 경우가 있을 수 있는데요.  
-> 실제로 해당 코드가 동작하였을 때, 오류가 발생하지 않고 동작하였음에도 불구하고 eventLog에 대한 데이터는 insert 되지 않는 상황이 생기게 됩니다.
+> 실제로 해당 코드가 동작하였을 때, 오류가 발생하지 않고 동작하였음에도 불구하고 eventLog 에 대한 데이터는 insert 되지 않는 상황이 생기게 됩니다.
 > 이유는 @TransactionalEventListener 의 경우 event publisher(여기서는 SavedMemberEvent 를 발생시킨 Service) 의 트랜잭션 안에서 동작하며, 
 > 커밋이 된 이후 추가 커밋을 허용하지 않기 때문인데요.  
 > 때문에 insert, update, delete 같은 작업이 필요한 경우 아래 코드와 같이 이벤트 리스너에서 @Transactional(propagation = Propagation.REQUIRES_NEW)를 
@@ -265,7 +265,7 @@
 > }
 > ```
 > REQUIRES_NEW 설정은 해당 메서드가 이전 트랜잭션을 이어받지 않고 새로운 트랜잭션을 시작하겠다는 설정인데요.  
-> event publisher 의 commit을 보장하고, 이벤트 리스너에서는 새로운 트랜잭션에서의 작업 수행을 가능하게 합니다.  
+> event publisher 의 commit 을 보장하고, 이벤트 리스너에서는 새로운 트랜잭션에서의 작업 수행을 가능하게 합니다.  
 
 ### 참조사이트
 > [spring 이벤트 사용하기(event publisher, event listener)](https://wildeveloperetrain.tistory.com/217)  
